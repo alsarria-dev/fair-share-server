@@ -45,7 +45,7 @@ router.put("/:userId", (req, res, next) => {
         const payload = { _id, email, name, profilePic };
 
         // Create a JSON Web Token and sign it
-        const authToken = jwt.sign(payload, process.env.TOKEN_SECRET, {
+        const authToken = jwt.sign(payload, process.env.JWT_SECRET, {
           algorithm: "HS256",
           expiresIn: "6h",
         });
