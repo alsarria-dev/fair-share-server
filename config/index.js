@@ -22,8 +22,7 @@ module.exports = (app) => {
   // controls a very specific header to pass headers from the frontend
   app.use(
     cors({
-      // origin: "*",
-      origin: "https://app-fair-share.vercel.app:3000",
+      origin: "*",
     })
   );
 
