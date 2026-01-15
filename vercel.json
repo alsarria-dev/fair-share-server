@@ -8,13 +8,13 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/routes/(.*)",
       "destination": "/server.js"
     }
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/routes/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
