@@ -14,11 +14,11 @@
   ],
   "headers": [
     {
-      "source": "/routes/(.*)",
+      "source": "/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://app-fair-share.vercel.app/"
+          "value": "*"
         },
         {
           "key": "Access-Control-Allow-Methods",
