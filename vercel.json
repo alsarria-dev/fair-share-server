@@ -14,7 +14,7 @@
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/routes/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
