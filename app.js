@@ -4,28 +4,9 @@ require("dotenv").config();
 
 // ℹ️ package responsible to make the connection with mongodb
 // https://www.npmjs.com/package/mongoose
-const mongoose = require("mongoose");
-
-// ℹ️ Sets the MongoDB URI for our app to have access to it.
-// If no env has been set, we dynamically set it to whatever the folder name was upon the creation of the app
-
-const MONGO_URI = process.env.MONGODB_URI
-
-mongoose
-  .connect(MONGO_URI)
-  .then((x) => {
-    console.log(x.connections[0].name);
-    const dbName = x.connections[0].name;
-    console.log(`Connected to Mongo! Database name: "${dbName}"`);
-  })
-  .catch((err) => {
-    console.error("Error connecting to mongo: ", err);
-  });
-
 
 // ℹ️ Connects to the database
-// require("./db");
-
+require("./db");
 
 // Require necessary (isAuthenticated) middleware in order to control access to specific routes
 const { isAuthenticated } = require("./middleware/jwt.middleware.js");
@@ -41,7 +22,7 @@ require("./config")(app);
 
 // 👇 Start handling routes here
 app.get("/", (req, res, next) => {
-    res.status(418).json({ message: "Nothing to see here, for the moment" });
+  res.status(418).json({ message: "Nothing to see here, for the moment" });
 });
 
 const authRoutes = require("./routes/auth.routes");
