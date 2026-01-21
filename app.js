@@ -4,9 +4,11 @@ require("dotenv").config();
 
 // ℹ️ package responsible to make the connection with mongodb
 // https://www.npmjs.com/package/mongoose
+const mongoose = require("mongoose");
 
 // ℹ️ Connects to the database
 require("./db");
+
 
 // Require necessary (isAuthenticated) middleware in order to control access to specific routes
 const { isAuthenticated } = require("./middleware/jwt.middleware.js");
