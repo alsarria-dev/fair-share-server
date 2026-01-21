@@ -2,13 +2,8 @@
 // https://www.npmjs.com/package/dotenv
 require("dotenv").config();
 
-// ℹ️ package responsible to make the connection with mongodb
-// https://www.npmjs.com/package/mongoose
-const mongoose = require("mongoose");
-
 // ℹ️ Connects to the database
 require("./db");
-
 
 // Require necessary (isAuthenticated) middleware in order to control access to specific routes
 const { isAuthenticated } = require("./middleware/jwt.middleware.js");
@@ -16,7 +11,6 @@ const { isAuthenticated } = require("./middleware/jwt.middleware.js");
 // Handles http requests (express is node js framework)
 // https://www.npmjs.com/package/express
 const express = require("express");
-
 const app = express();
 
 // ℹ️ This function is getting exported from the config folder. It runs most pieces of middleware
@@ -40,6 +34,6 @@ const userRoutes = require("./routes/user.routes");
 app.use("/user", isAuthenticated, userRoutes);
 
 // ❗ To handle errors. Routes that don't exist or errors that you handle in specific routes
-require("./error-handling")(app);
+require("./errors")(app);
 
 module.exports = app;

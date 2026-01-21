@@ -1,3 +1,5 @@
+// ℹ️ package responsible to make the connection with mongodb
+// https://www.npmjs.com/package/mongoose
 const mongoose = require("mongoose");
 const uri = process.env.MONGODB_URI;
 
@@ -27,4 +29,4 @@ const mongooseClient = async () => {
   }
 }
 
-run()
+mongooseClient()
