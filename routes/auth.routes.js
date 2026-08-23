@@ -21,14 +21,17 @@ router.post("/signup", async (req, res, next) => {
   const { name, lastName, dateOfBirth, phoneNumber, email, password } =
     req.body;
 
-  // Check if email or password or name are provided as empty strings
+  // Every field must be present and non-empty. Checking only for `""` let a
+  // missing key through, and the password regex below then threw on `undefined`.
+  const isBlank = (value) => typeof value !== "string" || value.trim() === "";
+
   if (
-    name === "" ||
-    lastName === "" ||
-    dateOfBirth === "" ||
-    phoneNumber === "" ||
-    email === "" ||
-    password === ""
+    isBlank(name) ||
+    isBlank(lastName) ||
+    isBlank(dateOfBirth) ||
+    isBlank(phoneNumber) ||
+    isBlank(email) ||
+    isBlank(password)
   ) {
     res
       .status(400)
@@ -60,19 +63,30 @@ router.post("/signup", async (req, res, next) => {
     return;
   }
 
-  // If email is unique, proceed to hash the password
-  const salt = bcrypt.genSaltSync(saltRounds);
-  const hashedPassword = bcrypt.hashSync(password, salt);
+  // If email is unique, proceed to hash the password.
+  // The async variant keeps the event loop free while bcrypt runs.
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-  // Create the new user in the database
-  const createdUser = await User.create({
-    name,
-    lastName,
-    dateOfBirth,
-    phoneNumber,
-    email,
-    password: hashedPassword,
-  });
+  let createdUser;
+  try {
+    // Create the new user in the database
+    createdUser = await User.create({
+      name,
+      lastName,
+      dateOfBirth,
+      phoneNumber,
+      email,
+      password: hashedPassword,
+    });
+  } catch (err) {
+    // Two concurrent signups can both pass the findOne check above, so the
+    // unique index is the real guard - report it the same way.
+    if (err.code === 11000) {
+      res.status(400).json({ message: "User already exists." });
+      return;
+    }
+    throw err;
+  }
 
   // Deconstruct the newly created user object to omit the password
   // We should never expose passwords publicly
@@ -87,8 +101,10 @@ router.post("/signup", async (req, res, next) => {
 router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
 
-  // Check if email or password are provided as empty string
-  if (email === "" || password === "") {
+  // Both fields must actually be present. A missing `email` used to reach
+  // `findOne({ email: undefined })`, which mongoose strips to `findOne({})` -
+  // matching an arbitrary user rather than failing.
+  if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
     res.status(400).json({ message: "Email and password are required." });
     return;
   }
@@ -96,17 +112,19 @@ router.post("/login", async (req, res, next) => {
   // Check the users collection if a user with the same email exists
   // password has `select: false` on the schema, so it must be re-selected explicitly here
   const foundUser = await User.findOne({ email: email }).select("+password");
+
+  // A distinct "user not found" reply let anyone probe which emails are
+  // registered, so both failure modes return the same message.
   if (!foundUser) {
-    // If the user is not found, send an error response
-    res.status(401).json({ message: "User not found." });
+    res.status(401).json({ message: "Invalid email or password." });
     return;
   }
 
   // Compare the provided password with the one saved in the database
-  const passwordCorrect = bcrypt.compareSync(password, foundUser.password);
+  const passwordCorrect = await bcrypt.compare(password, foundUser.password);
 
   if (!passwordCorrect) {
-    res.status(401).json({ message: "Password Incorrect" });
+    res.status(401).json({ message: "Invalid email or password." });
     return;
   }
 

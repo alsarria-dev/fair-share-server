@@ -9,9 +9,27 @@ const User = require("../models/User.model");
 
 const saltRounds = 10;
 
+// Fields a client is allowed to change on a profile. Spreading `req.body`
+// straight into the update let a caller set anything on the schema.
+const UPDATABLE_FIELDS = [
+  "name",
+  "lastName",
+  "dateOfBirth",
+  "phoneNumber",
+  "email",
+  "profilePic",
+  "password",
+];
+
 // Gets user details
 router.get("/:userId", async (req, res, next) => {
   const { userId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    res.status(400).json({ message: "Specified id is not valid" });
+    return;
+  }
+
   const user = await User.findById(userId).lean();
 
   if (!user) {
@@ -48,16 +66,29 @@ router.put("/:userId", async (req, res, next) => {
     return;
   }
 
-  const updates = { ...req.body };
+  // Any logged-in user could previously edit any other user's profile.
+  if (userId !== req.payload._id) {
+    res.status(403).json({ message: "You can only edit your own profile" });
+    return;
+  }
+
+  const updates = {};
+  for (const field of UPDATABLE_FIELDS) {
+    if (req.body[field] !== undefined) {
+      updates[field] = req.body[field];
+    }
+  }
 
   // Passwords must never be persisted in plain text
   if (updates.password) {
-    const salt = bcrypt.genSaltSync(saltRounds);
-    updates.password = bcrypt.hashSync(updates.password, salt);
+    updates.password = await bcrypt.hash(updates.password, saltRounds);
   }
 
+  // `findByIdAndUpdate` skips schema validation unless asked, so a bad email or
+  // date could be written straight past the model's rules.
   const userUpdated = await User.findByIdAndUpdate(userId, updates, {
     new: true,
+    runValidators: true,
   });
 
   if (!userUpdated) {
