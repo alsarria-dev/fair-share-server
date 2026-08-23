@@ -11,6 +11,12 @@ module.exports = (app) => {
 
     // only render if the error ocurred before sending the response
     if (!res.headersSent) {
+      // express-jwt throws this when a token is missing, malformed, or expired
+      if (err.name === "UnauthorizedError") {
+        res.status(err.status || 401).json({ message: err.message });
+        return;
+      }
+
       // Mongoose throws these for malformed ids / failed schema validation -
       // both are client mistakes, not server failures
       const isClientError =

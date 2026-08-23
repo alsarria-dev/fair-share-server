@@ -20,9 +20,11 @@ module.exports = (app) => {
   app.set("trust proxy", 1);
 
   // controls a very specific header to pass headers from the frontend
+  // Open to any origin: auth is a Bearer JWT header, not cookies, so there's
+  // no credentials/cookie exposure risk in accepting requests from anywhere.
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN || "https://app-fair-share.vercel.app",
+      origin: "*",
     }),
   );
 

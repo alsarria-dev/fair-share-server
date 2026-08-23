@@ -45,7 +45,7 @@ The backend is built on the Node.js and Express.js framework and connects to a M
 - **Expense Tracking**: Create, update, and delete expenses within groups; only an expense's author can delete it
 - **Data Relationships**: Well-structured MongoDB collections with proper references and relationships
 - **Centralized Error Handling**: Every route returns standard HTTP status codes (400/401/403/404/500) instead of always responding 200
-- **CORS Support**: Cross-origin resource sharing enabled for frontend communication, configurable via an environment variable
+- **CORS Support**: Open to any origin — safe here since auth is a Bearer JWT header, not cookies
 - **Request Logging**: Morgan logger for tracking incoming requests
 
 ## Tech Stack
@@ -126,7 +126,6 @@ fair-share-server/
    MONGODB_URI=your_mongodb_connection_string
    JWT_SECRET=your_jwt_secret_key
    PORT=5005
-   # CORS_ORIGIN=http://localhost:3000   # optional, only needed for local frontend testing
    ```
    `.env.local` takes precedence over `.env` if both exist — both are gitignored.
 
@@ -134,7 +133,7 @@ fair-share-server/
 
 The server configuration is handled in the `config/index.js` file, which sets up:
 
-- **CORS**: Accepts requests from the frontend origin in `CORS_ORIGIN`, falling back to the deployed frontend URL if that variable isn't set
+- **CORS**: Open to any origin (`*`) — safe here since auth is a Bearer JWT header, not cookies
 - **Trust Proxy**: Enabled for hosting environments with proxy servers
 - **Body Parser**: JSON request parsing middleware
 - **Cookie Parser**: Cookie handling middleware
