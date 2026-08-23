@@ -1,18 +1,18 @@
 # Fair Share - Server
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white" alt="Node.js" />
-  <img src="https://img.shields.io/badge/Express.js-000000?style=flat&logo=express&logoColor=white" alt="Express.js" />
-  <img src="https://img.shields.io/badge/MongoDB-47A248?style=flat&logo=mongodb&logoColor=white" alt="MongoDB" />
-  <img src="https://img.shields.io/badge/Mongoose-880000?style=flat" alt="Mongoose" />
-  <img src="https://img.shields.io/badge/JWT-000000?style=flat&logo=jsonwebtokens&logoColor=white" alt="JWT" />
-  <img src="https://img.shields.io/badge/bcrypt-338?style=flat" alt="bcrypt" />
-  <img src="https://img.shields.io/badge/CORS-4A90E2?style=flat" alt="CORS" />
-  <img src="https://img.shields.io/badge/Morgan-000000?style=flat" alt="Morgan" />
-  <img src="https://img.shields.io/badge/dotenv-ECD53F?style=flat" alt="dotenv" />
-  <img src="https://img.shields.io/badge/Nodemon-76D04B?style=flat&logo=nodemon&logoColor=white" alt="Nodemon" />
-  <img src="https://img.shields.io/badge/Vercel-000000?style=flat&logo=vercel&logoColor=white" alt="Vercel" />
-</p>
+[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-5.2-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white)](https://www.mongodb.com/atlas)
+[![Mongoose](https://img.shields.io/badge/Mongoose-9.9-880000?style=flat-square&logo=mongoose&logoColor=white)](https://mongoosejs.com/)
+[![JWT](https://img.shields.io/badge/JWT-9.0-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)](https://github.com/auth0/node-jsonwebtoken)
+[![bcrypt](https://img.shields.io/badge/bcrypt-6.0-338833?style=flat-square)](https://github.com/kelektiv/node.bcrypt.js)
+[![CORS](https://img.shields.io/badge/CORS-2.8-4A90E2?style=flat-square)](https://github.com/expressjs/cors)
+[![Morgan](https://img.shields.io/badge/Morgan-1.11-000000?style=flat-square)](https://github.com/expressjs/morgan)
+[![dotenv](https://img.shields.io/badge/dotenv-17.4-ECD53F?style=flat-square&logo=dotenv&logoColor=black)](https://github.com/motdotla/dotenv)
+[![Nodemon](https://img.shields.io/badge/Nodemon-3.1-76D04B?style=flat-square&logo=nodemon&logoColor=white)](https://nodemon.io/)
+[![ESLint](https://img.shields.io/badge/ESLint-10.9-4B32C3?style=flat-square&logo=eslint&logoColor=white)](https://eslint.org/)
+[![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://app-fair-share.vercel.app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-8BD8BC?style=flat-square)](https://opensource.org/licenses/MIT)
 
 ## 📋 Table of Contents
 
