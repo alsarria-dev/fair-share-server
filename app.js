@@ -3,7 +3,7 @@
 require("dotenv").config({ path: [".env.local", ".env"] });
 
 // ℹ️ Connects to the database
-require("./db");
+const connectToDb = require("./db");
 
 // Require necessary (isAuthenticated) middleware in order to control access to specific routes
 const { isAuthenticated } = require("./middleware/jwt.middleware.js");
@@ -19,6 +19,15 @@ require("./config")(app);
 // 👇 Start handling routes here
 app.get("/", (req, res, next) => {
   res.status(418).json({ message: "Nothing to see here, for the moment" });
+});
+
+// Every route below this point queries the database. Awaiting the connection
+// here means a cold start finishes its handshake before we answer, instead of
+// replying early and letting the platform freeze the half-open connection.
+// Preflight carries no body to query, so it skips the wait.
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") return next();
+  connectToDb().then(() => next(), next);
 });
 
 const authRoutes = require("./routes/auth.routes");

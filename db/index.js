@@ -4,10 +4,11 @@ const mongoose = require("mongoose");
 
 const uri = process.env.MONGODB_URI;
 
-// Queries issued before the connection is up sit in mongoose's buffer. The
-// 10s default turns any connectivity problem into a slow, opaque 500, so fail
-// fast instead and let the error handler surface it as a 503.
-mongoose.set("bufferTimeoutMS", 2000);
+// Requests wait on the connection promise (see app.js) rather than racing it,
+// so buffering is a safety net for a connection dropped mid-flight, not the
+// normal path. It has to outlast a cold-start handshake or it fires first and
+// masks the real error.
+mongoose.set("bufferTimeoutMS", 20000);
 
 mongoose.connection.on("error", (err) => {
   console.error("MongoDB connection error:", err.message);
@@ -20,43 +21,45 @@ mongoose.connection.on("disconnected", () =>
 );
 
 const clientOptions = {
-  serverSelectionTimeoutMS: 5000,
+  // A serverless instance is frozen the moment it responds, so any handshake
+  // still in flight is suspended and resumes against a clock that kept running.
+  // 15s absorbs a cold DNS/TLS/auth round trip plus that lost time.
+  serverSelectionTimeoutMS: 15000,
   serverApi: { version: "1", strict: true, deprecationErrors: true },
   dbName: "fair-share",
 };
 
-// Serving traffic without a database only produces buffering timeouts on every
-// request, so a failed connection is fatal rather than something we log past.
-// On Vercel each invocation is short-lived and exiting would just crash-loop
-// the function, so there we stay up and let requests fail with a clear 503.
-const abort = () => {
-  if (process.env.VERCEL) return;
-  process.exit(1);
-};
+// Module scope survives across warm invocations, so the promise is created once
+// and every later request reuses the open connection. A failed attempt clears
+// the cache instead of poisoning the instance, letting the next request retry.
+let connectionPromise = null;
 
-const connectToDb = async () => {
+const openConnection = async () => {
   if (!uri) {
-    console.error(
+    throw new Error(
       "MONGODB_URI is not set. Add it to .env.local (see .env.example).",
     );
-    return abort();
   }
 
-  try {
-    // Create a Mongoose client with a MongoClientOptions object to set the Stable API version
-    await mongoose.connect(uri, clientOptions);
-    await mongoose.connection.db.admin().command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!",
-    );
-  } catch (err) {
-    console.error("Could not connect to MongoDB:", err.message);
-    console.error(
-      "Check that the Atlas cluster is running (free-tier clusters auto-pause) " +
-        "and that this machine's IP is on the cluster's Network Access list.",
-    );
-    return abort();
-  }
+  await mongoose.connect(uri, clientOptions);
+  console.log("Connected to MongoDB");
+  return mongoose.connection;
 };
 
-module.exports = connectToDb();
+const connectToDb = () => {
+  // 1 === connected. Already-open connections skip the promise entirely.
+  if (mongoose.connection.readyState === 1) {
+    return Promise.resolve(mongoose.connection);
+  }
+
+  if (!connectionPromise) {
+    connectionPromise = openConnection().catch((err) => {
+      connectionPromise = null;
+      throw err;
+    });
+  }
+
+  return connectionPromise;
+};
+
+module.exports = connectToDb;
