@@ -1,5 +1,19 @@
 # Fair Share - Server
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white" alt="Node.js" />
+  <img src="https://img.shields.io/badge/Express.js-000000?style=flat&logo=express&logoColor=white" alt="Express.js" />
+  <img src="https://img.shields.io/badge/MongoDB-47A248?style=flat&logo=mongodb&logoColor=white" alt="MongoDB" />
+  <img src="https://img.shields.io/badge/Mongoose-880000?style=flat" alt="Mongoose" />
+  <img src="https://img.shields.io/badge/JWT-000000?style=flat&logo=jsonwebtokens&logoColor=white" alt="JWT" />
+  <img src="https://img.shields.io/badge/bcrypt-338?style=flat" alt="bcrypt" />
+  <img src="https://img.shields.io/badge/CORS-4A90E2?style=flat" alt="CORS" />
+  <img src="https://img.shields.io/badge/Morgan-000000?style=flat" alt="Morgan" />
+  <img src="https://img.shields.io/badge/dotenv-ECD53F?style=flat" alt="dotenv" />
+  <img src="https://img.shields.io/badge/Nodemon-76D04B?style=flat&logo=nodemon&logoColor=white" alt="Nodemon" />
+  <img src="https://img.shields.io/badge/Vercel-000000?style=flat&logo=vercel&logoColor=white" alt="Vercel" />
+</p>
+
 ## 📋 Table of Contents
 
 - [Introduction](#introduction)
@@ -11,6 +25,7 @@
 - [API Endpoints](#api-endpoints)
 - [Database Models](#database-models)
 - [Authentication](#authentication)
+- [Error Handling](#error-handling)
 - [Running the Server](#running-the-server)
 - [Development](#development)
 - [Authors](#authors)
@@ -19,18 +34,18 @@
 
 Fair Share is an expense management application built during the Ironhacks web development bootcamp. This server-side application provides a structured and scalable backend to handle expenses of any kind through groups, users, and expense management.
 
-The backend is built on the Node.js and Express.js framework and connects to a MongoDB database. It implements JWT-based authentication, password encryption with bcrypt, and comprehensive error handling to ensure secure and reliable communication with the client.
+The backend is built on the Node.js and Express.js framework and connects to a MongoDB database. It implements JWT-based authentication, password encryption with bcrypt, author-based authorization on destructive actions, and centralized error handling that returns standard HTTP status codes.
 
 ## Features
 
 - **User Management**: Create user accounts, authenticate users, and manage user profiles
-- **Password Security**: Bcrypt-based password encryption with strong password requirements
+- **Password Security**: Bcrypt-based password hashing (10 salt rounds); password hashes are excluded from every API response by default and only re-selected internally to verify a login
 - **JWT Authentication**: Secure token-based authentication for protected routes
-- **Group Management**: Create and manage expense groups with multiple users
-- **Expense Tracking**: Create, update, and delete expenses within groups
+- **Group Management**: Create and manage expense groups with multiple users; only a group's author can delete it
+- **Expense Tracking**: Create, update, and delete expenses within groups; only an expense's author can delete it
 - **Data Relationships**: Well-structured MongoDB collections with proper references and relationships
-- **Error Handling**: Comprehensive error handling and validation
-- **CORS Support**: Cross-origin resource sharing enabled for frontend communication
+- **Centralized Error Handling**: Every route returns standard HTTP status codes (400/401/403/404/500) instead of always responding 200
+- **CORS Support**: Cross-origin resource sharing enabled for frontend communication, configurable via an environment variable
 - **Request Logging**: Morgan logger for tracking incoming requests
 
 ## Tech Stack
@@ -54,6 +69,7 @@ fair-share-server/
 ├── server.js                # Server entry point
 ├── package.json             # Project dependencies
 ├── vercel.json              # Vercel deployment configuration
+├── .env.example             # Template for required environment variables
 ├── config/
 │   └── index.js             # Middleware and CORS configuration
 ├── db/
@@ -83,7 +99,7 @@ fair-share-server/
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js (v18 or higher)
 - MongoDB (local or Atlas)
 - npm or yarn
 
@@ -100,23 +116,25 @@ fair-share-server/
    npm install
    ```
 
-3. **Create environment variables**
+3. **Create your local environment file**
    ```bash
-   cp .env.example .env
+   cp .env.example .env.local
    ```
 
-4. **Update .env file** with your configuration:
+4. **Update `.env.local`** with your configuration:
    ```
    MONGODB_URI=your_mongodb_connection_string
    JWT_SECRET=your_jwt_secret_key
    PORT=5005
+   # CORS_ORIGIN=http://localhost:3000   # optional, only needed for local frontend testing
    ```
+   `.env.local` takes precedence over `.env` if both exist — both are gitignored.
 
 ## Configuration
 
 The server configuration is handled in the `config/index.js` file, which sets up:
 
-- **CORS**: Configured to accept requests from the frontend deployment URL
+- **CORS**: Accepts requests from the frontend origin in `CORS_ORIGIN`, falling back to the deployed frontend URL if that variable isn't set
 - **Trust Proxy**: Enabled for hosting environments with proxy servers
 - **Body Parser**: JSON request parsing middleware
 - **Cookie Parser**: Cookie handling middleware
@@ -160,6 +178,8 @@ The server configuration is handled in the `config/index.js` file, which sets up
 | GET | `/user/:userId` | Get specific user details |
 | PUT | `/user/:userId` | Update user information |
 
+Password hashes are never included in these responses. If `password` is present in a `PUT` body, it's re-hashed before being stored.
+
 ### Group Routes (`/groups`) - *Requires Authentication*
 
 | Method | Endpoint | Description |
@@ -168,13 +188,17 @@ The server configuration is handled in the `config/index.js` file, which sets up
 | GET | `/groups/details/:groupId` | Get specific group details |
 | POST | `/groups/` | Create a new group |
 | PUT | `/groups/:groupId` | Update group information |
+| PUT | `/groups/:groupId/:expenseId` | Add an expense to a group's expense list |
 | DELETE | `/groups/:groupId` | Delete a group |
+
+Only the group's `groupAuthor` can delete it — anyone else gets `403`.
 
 **Request Body - Create Group:**
 ```json
 {
   "name": "Weekend Trip",
   "description": "Expenses for the beach trip",
+  "groupAuthor": "userId",
   "groupUsers": ["userId1", "userId2"]
 }
 ```
@@ -186,20 +210,24 @@ The server configuration is handled in the `config/index.js` file, which sets up
 | GET | `/expenses/details/:expenseId` | Get specific expense details |
 | POST | `/expenses/` | Create a new expense |
 | PUT | `/expenses/:expenseId` | Update an expense |
-| DELETE | `/expenses/:expenseId` | Delete an expense |
+| DELETE | `/expenses/:groupId/:userId/:expenseId` | Delete an expense and remove it from its group |
+
+Only the expense's `expenseAuthor` can delete it — anyone else gets `403`.
 
 **Request Body - Create Expense:**
 ```json
 {
   "name": "Dinner",
-  "amount": 50.00,
   "description": "Group dinner",
-  "groupId": "groupId",
+  "concept": "Food",
+  "amount": 50.00,
+  "group": "groupId",
   "expenseAuthor": "userId",
-  "expenseUsers": ["userId1", "userId2"],
-  "expenseDate": "2024-01-28"
+  "expenseUsers": ["userId1", "userId2"]
 }
 ```
+
+`concept` must be one of: `Housing`, `Food`, `Transportation`, `Utilities`, `Insurance`, `Healthcare`, `Entertainment`, `Education`, `Personal Care`, `Savings`.
 
 ## Database Models
 
@@ -212,7 +240,7 @@ The server configuration is handled in the `config/index.js` file, which sets up
   dateOfBirth: Date (required),
   phoneNumber: String (required),
   email: String (unique, required),
-  password: String (required),
+  password: String (required, hidden from query results by default — select: false),
   profilePic: String (default profile picture),
   createdAt: Date,
   updatedAt: Date
@@ -225,8 +253,8 @@ The server configuration is handled in the `config/index.js` file, which sets up
 {
   name: String (required),
   description: String (required),
-  groupAuthor: ObjectId (references User),
-  groupUsers: [ObjectId] (references User),
+  groupAuthor: ObjectId (references User, required),
+  groupUsers: [ObjectId] (references User, indexed),
   groupExpenses: [ObjectId] (references Expense),
   groupPic: String (default group picture),
   createdAt: Date,
@@ -239,12 +267,13 @@ The server configuration is handled in the `config/index.js` file, which sets up
 ```javascript
 {
   name: String (required),
-  amount: Number (required),
-  description: String,
-  groupId: ObjectId (references Group),
+  description: String (required),
+  concept: String (required, one of a fixed set of categories),
+  amount: Number (min 0),
+  group: ObjectId (references Group),
   expenseAuthor: ObjectId (references User),
   expenseUsers: [ObjectId] (references User),
-  expenseDate: Date,
+  expensePic: String (default expense picture),
   createdAt: Date,
   updatedAt: Date
 }
@@ -260,12 +289,28 @@ The server uses JWT (JSON Web Tokens) for authentication:
 4. **Protected Routes**: Routes requiring authentication check for valid JWT tokens
 5. **Token Verification**: The `isAuthenticated` middleware validates tokens on protected endpoints
 
+Passwords are never exposed once stored: the `User` schema marks `password` as `select: false`, so it's excluded from every query — including populated `groupUsers`/`expenseUsers`/`expenseAuthor`/`groupAuthor` — everywhere except the login handler, which explicitly re-selects it to verify credentials.
+
 **Password Requirements:**
 - Minimum 8 characters
 - At least one uppercase letter
 - At least one lowercase letter
 - At least one number
 - At least one special character (!@#$%^&*)
+
+## Error Handling
+
+All routes funnel unexpected errors through a centralized handler instead of returning a raw error object with a `200` status:
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Invalid input, empty required fields, or a malformed/invalid MongoDB id |
+| `401` | Missing or incorrect login credentials |
+| `403` | Authenticated, but not authorized for this action (e.g. deleting someone else's group/expense) |
+| `404` | The requested resource doesn't exist |
+| `500` | Unexpected server-side failure — check the server console |
+
+Every error response has the shape `{ "message": "..." }`.
 
 ## Running the Server
 
@@ -276,7 +321,7 @@ Start the server with automatic reload on file changes:
 npm run dev
 ```
 
-The server will start on the port specified in your `.env` file (default: 5005)
+The server will start on the port specified in your `.env.local`/`.env` file (default: 5005)
 
 ### Production Mode
 
@@ -291,6 +336,8 @@ npm start
 
 - `npm run dev` - Run server with Nodemon (watches for changes)
 - `npm start` - Start server in production mode
+
+There is currently no automated test suite or lint configuration in this repo — verify changes manually.
 
 ### Tips
 
