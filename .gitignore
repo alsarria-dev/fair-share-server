@@ -5,7 +5,7 @@ node_modules/
 npm-debug.log
 
 # Environment Variables should NEVER be published
-.env
+.env*
 
 # macOS
 .DS_Store
@@ -21,3 +21,7 @@ ehthumbs.db
 
 # VS Code
 .vscode/*
+
+# Claude
+.claude*
+CLAUDE.md

@@ -2,33 +2,41 @@ const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
 
-// importing Group.model
+// importing models
 const Group = require("../models/Group.model");
 const Expense = require("../models/Expense.model");
 
-// Routes for groups without req.params
-
-// Gets all expenses
-router.get("/details/:expenseId", (req, res, next) => {
+// Gets a specific expense
+router.get("/details/:expenseId", async (req, res, next) => {
   const { expenseId } = req.params;
-  Expense.findById(expenseId)
+
+  if (!mongoose.Types.ObjectId.isValid(expenseId)) {
+    res.status(400).json({ message: "Specified id is not valid" });
+    return;
+  }
+
+  const expense = await Expense.findById(expenseId)
     .populate("expenseAuthor expenseUsers")
-    .then((allExpenses) => res.json(allExpenses))
-    .catch((error) => res.json(error));
+    .lean();
+
+  if (!expense) {
+    res.status(404).json({ message: "Expense not found" });
+    return;
+  }
+
+  res.status(200).json(expense);
 });
 
-// Creates a new expense and updates group collection that the expense is part of
-router.post("/", (req, res, next) => {
-  // const { name, concept,description, amount, group, expenseAuthor, expenseUsers } = req.body;
-
-  Expense.create(req.body)
-    .then((response) => res.status(200).json(response))
-    .catch((error) => res.json(error));
+// Creates a new expense
+router.post("/", async (req, res, next) => {
+  const expense = await Expense.create(req.body);
+  res.status(200).json(expense);
 });
 
-// Deletes expense
-router.delete("/:groupId/:userId/:expenseId", (req, res, next) => {
-  const { expenseId, userId, groupId } = req.params;
+// Deletes an expense and removes it from its group's groupExpenses list.
+// Only the expense's author may delete it.
+router.delete("/:groupId/:userId/:expenseId", async (req, res, next) => {
+  const { expenseId, groupId } = req.params;
 
   // Checks _id is a valid object type for our model
   if (!mongoose.Types.ObjectId.isValid(expenseId)) {
@@ -36,46 +44,32 @@ router.delete("/:groupId/:userId/:expenseId", (req, res, next) => {
     return;
   }
 
-  // Only admin can delete group, we sent the userid through the request and check if it is
-  // an admin of the group that wants to delete
-  Expense.findByIdAndDelete(expenseId)
-    .then((response) => {
-      // if (response.expenseAuthor !== userId) {
-      //     res.status(400).json({ message: [groupId, userId, expenseId] })
-      //     return;
-      // };
+  const expense = await Expense.findById(expenseId);
 
-      // return promise here to concatonate next promises
-      return Group.findByIdAndUpdate(
-        groupId,
-        { $pull: { groupExpenses: expenseId } },
-        { new: true },
-      );
-    })
-    .then((deletedExpense) => res.status(202).json({ message: "lol" }))
-    .catch((error) => res.json(error));
-});
-
-// Routes for groups with req.params
-
-// Gets a specific group based on url params from details page - Details page
-router.get("/:groupId", (req, res, next) => {
-  const { groupId } = req.params;
-
-  // Checks _id is a valid object type for our model
-  if (!mongoose.Types.ObjectId.isValid(groupId)) {
-    res.status(400).json({ message: "Specified id is not valid" });
+  if (!expense) {
+    res.status(404).json({ message: "Expense not found" });
     return;
   }
 
-  Group.findById(groupId)
-    .populate("groupExpenses groupUsers")
-    .then((response) => res.json(response))
-    .catch((error) => res.json(error));
+  if (expense.expenseAuthor.toString() !== req.payload._id) {
+    res
+      .status(403)
+      .json({ message: "Only the expense author can delete this expense" });
+    return;
+  }
+
+  await Expense.findByIdAndDelete(expenseId);
+  await Group.findByIdAndUpdate(
+    groupId,
+    { $pull: { groupExpenses: expenseId } },
+    { new: true },
+  );
+
+  res.status(200).json({ message: "Expense deleted successfully" });
 });
 
-// Updates group information based on url params from details page - Details page
-router.put("/:expenseId", (req, res, next) => {
+// Updates an expense
+router.put("/:expenseId", async (req, res, next) => {
   const { expenseId } = req.params;
 
   // Checks _id is a valid object type for our model
@@ -84,64 +78,18 @@ router.put("/:expenseId", (req, res, next) => {
     return;
   }
 
-  Expense.findByIdAndUpdate(expenseId, req.body, { new: true })
-    .then((response) => res.json(response))
-    .catch((error) => res.json(error));
-});
+  const updatedExpense = await Expense.findByIdAndUpdate(
+    expenseId,
+    req.body,
+    { new: true },
+  );
 
-// Deletes group based on params from details page - Details page
-router.delete("/:groupId", (req, res, next) => {
-  const { userId } = req.body;
-  const { groupId } = req.params;
-
-  // Checks _id is a valid object type for our model
-  if (!mongoose.Types.ObjectId.isValid(groupId)) {
-    res.status(400).json({ message: "Specified id is not valid" });
+  if (!updatedExpense) {
+    res.status(404).json({ message: "Expense not found" });
     return;
   }
 
-  // Only admin can delete group, we sent the userid through the request and check if it is
-  // an admin of the group that wants to delete
-  Group.findById(groupId)
-    .then((response) => {
-      if (response.admin != userId) {
-        res
-          .status(400)
-          .json({ message: "You are not an admin for this group" });
-        return;
-      }
-
-      return Group.findByIdAndDelete(groupId);
-    })
-    .then((deletedGroup) => res.status(202).json(deletedGroup))
-    .catch((error) => res.json(error));
-});
-
-//to dos: put request with expense id, delete request  with expense id, post request group id
-router.put("/expense/:expenseId", (req, res, next) => {
-  const { expenseId } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(expenseId)) {
-    res.status(400).json({ message: "Specified id is not valid" });
-    return;
-  }
-
-  Expense.findByIdAndUpdate(expenseId, req.body, { new: true })
-    .then((updatedExpense) => res.json(updatedExpense))
-    .catch((error) => res.json(error));
-});
-
-router.delete("/expense/:expenseId", (req, res, next) => {
-  const { expenseId } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(expenseId)) {
-    res.status(400).json({ message: "Specified id is not valid" });
-    return;
-  }
-
-  Expense.findByIdAndDelete(expenseId)
-    .then((deletedExpense) => res.status(202).json(deletedExpense))
-    .catch((error) => res.json(error));
+  res.status(200).json(updatedExpense);
 });
 
 module.exports = router;

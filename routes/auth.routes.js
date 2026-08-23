@@ -17,7 +17,7 @@ const { isAuthenticated } = require("../middleware/jwt.middleware.js");
 const saltRounds = 10;
 
 // POST /auth/signup  - Creates a new user in the database
-router.post("/signup", (req, res, next) => {
+router.post("/signup", async (req, res, next) => {
   const { name, lastName, dateOfBirth, phoneNumber, email, password } =
     req.body;
 
@@ -54,93 +54,82 @@ router.post("/signup", (req, res, next) => {
   }
 
   // Check the users collection if a user with the same email already exists
-  User.findOne({ email: email })
-    .then((foundUser) => {
-      // If the user with the same email already exists, send an error response
-      if (foundUser) {
-        res.status(400).json({ message: "User already exists." });
-        return;
-      }
+  const foundUser = await User.findOne({ email: email });
+  if (foundUser) {
+    res.status(400).json({ message: "User already exists." });
+    return;
+  }
 
-      // If email is unique, proceed to hash the password
-      const salt = bcrypt.genSaltSync(saltRounds);
-      const hashedPassword = bcrypt.hashSync(password, salt);
+  // If email is unique, proceed to hash the password
+  const salt = bcrypt.genSaltSync(saltRounds);
+  const hashedPassword = bcrypt.hashSync(password, salt);
 
-      // Create the new user in the database
-      // We return a pending promise, which allows us to chain another `then`
-      return User.create({
-        name,
-        lastName,
-        dateOfBirth,
-        phoneNumber,
-        email,
-        password: hashedPassword,
-      });
-    })
-    .then((createdUser) => {
-      // Deconstruct the newly created user object to omit the password
-      // We should never expose passwords publicly
-      const { _id, name, lastName, dateOfBirth, phoneNumber, email } =
-        createdUser;
+  // Create the new user in the database
+  const createdUser = await User.create({
+    name,
+    lastName,
+    dateOfBirth,
+    phoneNumber,
+    email,
+    password: hashedPassword,
+  });
 
-      // Create a new object that doesn't expose the password
-      const user = { _id, name, lastName, dateOfBirth, phoneNumber, email };
+  // Deconstruct the newly created user object to omit the password
+  // We should never expose passwords publicly
+  const { _id } = createdUser;
+  const user = { _id, name, lastName, dateOfBirth, phoneNumber, email };
 
-      // Send a json response containing the user object
-      res.status(201).json({ user: user });
-    })
-    .catch((error) => next(error)); // In this case, we send error handling to the error handling middleware.
+  // Send a json response containing the user object
+  res.status(201).json({ user: user });
 });
 
 // POST  /auth/login - Verifies email and password and returns a JWT
-router.post("/login", (req, res, next) => {
+router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
 
   // Check if email or password are provided as empty string
   if (email === "" || password === "") {
-    res.status(400).json({ message: req.ip});
+    res.status(400).json({ message: "Email and password are required." });
     return;
   }
 
   // Check the users collection if a user with the same email exists
-  User.findOne({ email: email })
-    .then((foundUser) => {
-      if (!foundUser) {
-        // If the user is not found, send an error response
-        res.status(401).json({ message: "User not found." });
-        return;
-      }
+  // password has `select: false` on the schema, so it must be re-selected explicitly here
+  const foundUser = await User.findOne({ email: email }).select("+password");
+  if (!foundUser) {
+    // If the user is not found, send an error response
+    res.status(401).json({ message: "User not found." });
+    return;
+  }
 
-      // Compare the provided password with the one saved in the database
-      const passwordCorrect = bcrypt.compareSync(password, foundUser.password);
+  // Compare the provided password with the one saved in the database
+  const passwordCorrect = bcrypt.compareSync(password, foundUser.password);
 
-      if (passwordCorrect) {
-        // Deconstruct the user object to omit the password
-        const { _id, email, name, profilePic } = foundUser;
+  if (!passwordCorrect) {
+    res.status(401).json({ message: "Password Incorrect" });
+    return;
+  }
 
-        // Create an object that will be set as the token payload
-        const payload = { _id, email, name, profilePic };
+  // Deconstruct the user object to omit the password
+  const { _id, email: userEmail, name, profilePic } = foundUser;
 
-        // Create a JSON Web Token and sign it
-        const authToken = jwt.sign(payload, process.env.JWT_SECRET, {
-          algorithm: "HS256",
-          expiresIn: "6h",
-        });
+  // Create an object that will be set as the token payload
+  const payload = { _id, email: userEmail, name, profilePic };
 
-        // Send the token as the response
-        res.status(200).json({ authToken: authToken, data: { _id, name } });
-      } else {
-        res.status(401).json({ message: "Password Incorrect" });
-      }
-    })
-    .catch((error) => next(error)); // In this case, we send error handling to the error handling middleware.
+  // Create a JSON Web Token and sign it
+  const authToken = jwt.sign(payload, process.env.JWT_SECRET, {
+    algorithm: "HS256",
+    expiresIn: "6h",
+  });
+
+  // Send the token as the response
+  res.status(200).json({ authToken: authToken, data: { _id, name } });
 });
 
 // GET  /auth/verify  -  Used to verify JWT stored on the client
 router.get("/verify", isAuthenticated, (req, res, next) => {
   // If JWT token is valid the payload gets decoded by the
   // isAuthenticated middleware and is made available on `req.payload`
-  console.log(`req.payload`, req.payload);
 
   // Send back the token payload object containing the user data
   res.status(200).json(req.payload);

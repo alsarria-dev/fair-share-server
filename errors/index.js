@@ -11,8 +11,15 @@ module.exports = (app) => {
 
     // only render if the error ocurred before sending the response
     if (!res.headersSent) {
-      res.status(500).json({
-        message: "Internal server error. Check the server console",
+      // Mongoose throws these for malformed ids / failed schema validation -
+      // both are client mistakes, not server failures
+      const isClientError =
+        err.name === "CastError" || err.name === "ValidationError";
+
+      res.status(isClientError ? 400 : 500).json({
+        message: isClientError
+          ? err.message
+          : "Internal server error. Check the server console",
       });
     }
   });

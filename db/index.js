@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const uri = process.env.MONGODB_URI;
 
 mongoose.connection.on("error", (err) => {
-  logError(err);
+  console.error(err);
 });
 
 mongoose.connection.on("connected", () => console.log("connected to DB"));

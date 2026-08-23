@@ -4,38 +4,24 @@ const router = express.Router();
 
 // importing Group.model
 const Group = require("../models/Group.model");
-const Expense = require("../models/Expense.model");
 
-// Routes for groups without req.params
-
-// Gets all projects - Home Page
-router.get("/:userId", (req, res, next) => {
+// Gets all groups a user belongs to - Home Page
+router.get("/:userId", async (req, res, next) => {
   const { userId } = req.params;
-  Group.find({ groupUsers: userId })
+  const allGroups = await Group.find({ groupUsers: userId })
     .populate("groupExpenses groupUsers")
-    .then((allGroups) => res.json(allGroups))
-    .catch((error) => res.json(error));
+    .lean();
+  res.status(200).json(allGroups);
 });
 
 // Creates new group for expenses - Home Page
-router.post("/", (req, res, next) => {
-  Group.create(req.body)
-    .then((response) => res.status(201).json(response))
-    .catch((error) => res.json(error));
+router.post("/", async (req, res, next) => {
+  const group = await Group.create(req.body);
+  res.status(201).json(group);
 });
-
-// Deletes group - Home Page
-router.delete("/:groupId", (req, res, next) => {
-  const { groupId } = req.params;
-  Group.findByIdAndDelete(groupId)
-    .then((response) => res.json(response))
-    .catch((error) => res.json(error));
-});
-
-// Routes for groups with req.params
 
 // Gets a specific group based on url params from details page - Details page
-router.get("/details/:groupId", (req, res, next) => {
+router.get("/details/:groupId", async (req, res, next) => {
   const { groupId } = req.params;
 
   // Checks _id is a valid object type for our model
@@ -44,14 +30,20 @@ router.get("/details/:groupId", (req, res, next) => {
     return;
   }
 
-  Group.findById(groupId)
+  const group = await Group.findById(groupId)
     .populate("groupExpenses groupUsers groupAuthor")
-    .then((response) => res.json(response))
-    .catch((error) => res.json(error));
+    .lean();
+
+  if (!group) {
+    res.status(404).json({ message: "Group not found" });
+    return;
+  }
+
+  res.status(200).json(group);
 });
 
 // Updates group information based on url params from details page - Details page
-router.put("/:groupId", (req, res, next) => {
+router.put("/:groupId", async (req, res, next) => {
   const { groupId } = req.params;
 
   // Checks _id is a valid object type for our model
@@ -60,26 +52,38 @@ router.put("/:groupId", (req, res, next) => {
     return;
   }
 
-  Group.findByIdAndUpdate(groupId, req.body, { new: true })
-    .then((response) => res.json(response))
-    .catch((error) => res.json(error));
+  const updatedGroup = await Group.findByIdAndUpdate(groupId, req.body, {
+    new: true,
+  });
+
+  if (!updatedGroup) {
+    res.status(404).json({ message: "Group not found" });
+    return;
+  }
+
+  res.status(200).json(updatedGroup);
 });
 
-router.put("/:groupId/:expenseId", (req, res, next) => {
+// Adds an expense to a group's groupExpenses list
+router.put("/:groupId/:expenseId", async (req, res, next) => {
   const { groupId, expenseId } = req.params;
 
-  Group.findByIdAndUpdate(
+  const updatedGroup = await Group.findByIdAndUpdate(
     groupId,
     { $push: { groupExpenses: expenseId } },
     { new: true },
-  )
-    .then((response) => res.json(response))
-    .catch((error) => res.json(error));
+  );
+
+  if (!updatedGroup) {
+    res.status(404).json({ message: "Group not found" });
+    return;
+  }
+
+  res.status(200).json(updatedGroup);
 });
 
-// Deletes group based on params from details page - Details page
-router.delete("/:groupId", (req, res, next) => {
-  const { userId } = req.body;
+// Deletes a group - only the group's author may delete it
+router.delete("/:groupId", async (req, res, next) => {
   const { groupId } = req.params;
 
   // Checks _id is a valid object type for our model
@@ -88,21 +92,22 @@ router.delete("/:groupId", (req, res, next) => {
     return;
   }
 
-  // Only admin can delete group, we sent the userid through the request and check if it is
-  // an admin of the group that wants to delete
-  Group.findById(groupId)
-    .then((response) => {
-      if (response.admin != userId) {
-        res
-          .status(400)
-          .json({ message: "You are not an admin for this group" });
-        return;
-      }
+  const group = await Group.findById(groupId);
 
-      return Group.findByIdAndDelete(groupId);
-    })
-    .then((deletedGroup) => res.status(202).json(deletedGroup))
-    .catch((error) => res.json(error));
+  if (!group) {
+    res.status(404).json({ message: "Group not found" });
+    return;
+  }
+
+  if (group.groupAuthor.toString() !== req.payload._id) {
+    res
+      .status(403)
+      .json({ message: "Only the group author can delete this group" });
+    return;
+  }
+
+  await Group.findByIdAndDelete(groupId);
+  res.status(200).json({ message: "Group deleted successfully" });
 });
 
 module.exports = router;
