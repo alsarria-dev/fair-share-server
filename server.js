@@ -1,3 +1,13 @@
+/**
+ * Local/traditional-host entry point.
+ *
+ * Not used on Vercel: there, `app.js`'s exported `app` is invoked directly per
+ * request by the `@vercel/node` runtime (see vercel.json), and the DB-readiness
+ * gate registered in app.js handles connecting instead of this file's
+ * connect-then-listen sequence.
+ *
+ * Key exports: none — this is a script, not a module other files require.
+ */
 const app = require("./app.js");
 const connectToDb = require("./db");
 

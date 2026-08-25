@@ -1,3 +1,15 @@
+/**
+ * Owns the single Mongoose connection to the `fair-share` MongoDB Atlas database.
+ *
+ * The tricky part this file solves: on Vercel, a "cold" serverless invocation
+ * needs to open a connection before it can do anything, but a "warm" one
+ * (reusing a frozen instance) already has one open and must not reconnect.
+ * `connectToDb` handles both by memoizing the in-flight connection promise at
+ * module scope, so every caller within the same process — cold or warm —
+ * awaits the same attempt instead of racing to open duplicate connections.
+ *
+ * Key exports: `connectToDb` (call and await before touching the database).
+ */
 // ℹ️ package responsible to make the connection with mongodb
 // https://www.npmjs.com/package/mongoose
 const mongoose = require("mongoose");
@@ -34,6 +46,14 @@ const clientOptions = {
 // the cache instead of poisoning the instance, letting the next request retry.
 let connectionPromise = null;
 
+/**
+ * Opens the Mongoose connection once. Not exported — always go through
+ * `connectToDb`, which wraps this in the memoized-promise/retry logic below.
+ *
+ * @returns {Promise<import("mongoose").Connection>} the active Mongoose connection
+ * @throws {Error} if `MONGODB_URI` is unset, or if `mongoose.connect` fails
+ *   (bad credentials, unreachable cluster, IP not allow-listed, etc.)
+ */
 const openConnection = async () => {
   if (!uri) {
     throw new Error(
@@ -46,6 +66,16 @@ const openConnection = async () => {
   return mongoose.connection;
 };
 
+/**
+ * Ensures a MongoDB connection is open, opening one if needed, and returns a
+ * promise every caller can safely await — including concurrent callers during
+ * the same connection attempt.
+ *
+ * @returns {Promise<import("mongoose").Connection>} resolves once connected
+ * @throws {Error} propagates `openConnection`'s error to the first caller(s)
+ *   awaiting a failed attempt; the failure also clears the cached promise so
+ *   the next call retries instead of replaying the same rejection forever.
+ */
 const connectToDb = () => {
   // 1 === connected. Already-open connections skip the promise entirely.
   if (mongoose.connection.readyState === 1) {

@@ -1,3 +1,19 @@
+/**
+ * Builds and configures the Express application.
+ *
+ * This is the assembly point for the whole request pipeline: env vars, the
+ * DB-readiness gate, cross-cutting middleware (config/index.js), the four
+ * resource routers, and the terminal error handling (errors/index.js) all get
+ * wired together here, in the order they need to run.
+ *
+ * Deliberately does NOT call `app.listen()` — that happens in server.js for a
+ * traditional long-running process. Vercel instead imports this file's export
+ * directly and invokes it per request, so keeping `app` listen-free lets both
+ * hosting models share the exact same middleware/route setup.
+ *
+ * Key exports: `app` (configured Express application instance).
+ */
+
 // ℹ️ Gets access to environment variables/settings
 // https://www.npmjs.com/package/dotenv
 require("dotenv").config({ path: [".env.local", ".env"] });

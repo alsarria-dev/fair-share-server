@@ -34,7 +34,9 @@
 
 Fair Share is an expense management application built during the Ironhacks web development bootcamp. This server-side application provides a structured and scalable backend to handle expenses of any kind through groups, users, and expense management.
 
-The backend is built on the Node.js and Express.js framework and connects to a MongoDB database. It implements JWT-based authentication, password encryption with bcrypt, author-based authorization on destructive actions, and centralized error handling that returns standard HTTP status codes.
+The backend is built on the Node.js and Express.js framework and connects to a MongoDB database. It implements JWT-based authentication, password encryption with bcrypt, membership/author-based authorization on every resource, and centralized error handling that returns standard HTTP status codes.
+
+**New to this codebase?** See [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit together, a request-lifecycle walkthrough, the data model, and a "where do I look to change X" guide.
 
 ## Features
 
@@ -70,6 +72,8 @@ fair-share-server/
 ├── package.json             # Project dependencies
 ├── vercel.json              # Vercel deployment configuration
 ├── .env.example             # Template for required environment variables
+├── eslint.config.js         # ESLint flat config
+├── ARCHITECTURE.md          # System design, request lifecycle, data model
 ├── config/
 │   └── index.js             # Middleware and CORS configuration
 ├── db/
@@ -177,7 +181,7 @@ The server configuration is handled in the `config/index.js` file, which sets up
 | GET | `/user/:userId` | Get specific user details |
 | PUT | `/user/:userId` | Update user information |
 
-Password hashes are never included in these responses. If `password` is present in a `PUT` body, it's re-hashed before being stored.
+Password hashes are never included in these responses. `PUT /user/:userId` is self-only — `:userId` must match the caller's own id, otherwise `403` — and only a fixed whitelist of fields can be changed; if `password` is among them, it's re-hashed before being stored.
 
 ### Group Routes (`/groups`) - *Requires Authentication*
 
@@ -190,17 +194,21 @@ Password hashes are never included in these responses. If `password` is present 
 | PUT | `/groups/:groupId/:expenseId` | Add an expense to a group's expense list |
 | DELETE | `/groups/:groupId` | Delete a group |
 
-Only the group's `groupAuthor` can delete it — anyone else gets `403`.
+Authorization tightens by action:
+- `GET /groups/:userId` is self-only (`:userId` must be the caller) — it's the "my groups" list, not a lookup of someone else's.
+- `GET /groups/details/:groupId` and `PUT /groups/:groupId/:expenseId` require the caller to be a member (author or in `groupUsers`).
+- `PUT /groups/:groupId` and `DELETE /groups/:groupId` are `groupAuthor`-only. `PUT` can also transfer authorship to another existing member.
+- Any of these return `403` if the caller doesn't qualify, `404` if the group doesn't exist.
 
 **Request Body - Create Group:**
 ```json
 {
   "name": "Weekend Trip",
   "description": "Expenses for the beach trip",
-  "groupAuthor": "userId",
   "groupUsers": ["userId1", "userId2"]
 }
 ```
+`groupAuthor` is always taken from the caller's token, never the request body — it doesn't need to be (and can't be) included here.
 
 ### Expense Routes (`/expenses`) - *Requires Authentication*
 
@@ -211,7 +219,7 @@ Only the group's `groupAuthor` can delete it — anyone else gets `403`.
 | PUT | `/expenses/:expenseId` | Update an expense |
 | DELETE | `/expenses/:groupId/:userId/:expenseId` | Delete an expense and remove it from its group |
 
-Only the expense's `expenseAuthor` can delete it — anyone else gets `403`.
+`GET /expenses/details/:expenseId` and `POST /expenses/` require membership of the expense's group (`expenseAuthor` is just "who paid," not an ownership flag). `PUT /expenses/:expenseId` and `DELETE /expenses/:groupId/:userId/:expenseId` are `expenseAuthor`-only — anyone else gets `403`; a nonexistent expense/group gets `404`.
 
 **Request Body - Create Expense:**
 ```json
@@ -305,9 +313,11 @@ All routes funnel unexpected errors through a centralized handler instead of ret
 |--------|---------|
 | `400` | Invalid input, empty required fields, or a malformed/invalid MongoDB id |
 | `401` | Missing or incorrect login credentials |
-| `403` | Authenticated, but not authorized for this action (e.g. deleting someone else's group/expense) |
+| `403` | Authenticated, but not authorized for this action (e.g. not a member of the group, or not its author) |
 | `404` | The requested resource doesn't exist |
+| `409` | A unique constraint was violated (e.g. that email is already registered) |
 | `500` | Unexpected server-side failure — check the server console |
+| `503` | The database is temporarily unreachable — retry shortly |
 
 Every error response has the shape `{ "message": "..." }`.
 
@@ -335,8 +345,9 @@ npm start
 
 - `npm run dev` - Run server with Nodemon (watches for changes)
 - `npm start` - Start server in production mode
+- `npm run lint` / `npm run lint:fix` - Check (or auto-fix) code style with ESLint
 
-There is currently no automated test suite or lint configuration in this repo — verify changes manually.
+There is currently no automated test suite in this repo — verify changes manually.
 
 ### Tips
 

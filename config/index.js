@@ -13,7 +13,16 @@ const cookieParser = require("cookie-parser");
 // unless the request is made from the same domain, by default express wont accept POST requests
 const cors = require("cors");
 
-// Middleware configuration
+/**
+ * Registers cross-cutting Express middleware on the given app instance.
+ *
+ * Order matters here: CORS has to run before routes so preflight/actual
+ * requests get the header regardless of what a route later does, and the
+ * body/cookie parsers have to run before any route reads `req.body`/`req.cookies`.
+ *
+ * @param {import("express").Express} app - the Express application to configure
+ * @returns {void}
+ */
 module.exports = (app) => {
   // Because this will be hosted on a server that will accept requests from outside and it will be hosted ona server with a `proxy`, express needs to know that it should trust that setting.
   // Services like Fly use something called a proxy and you need to add this to your server

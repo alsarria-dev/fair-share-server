@@ -1,3 +1,13 @@
+/**
+ * Authentication endpoints: signup, login, and token verification.
+ *
+ * Mounted at `/auth` in app.js WITHOUT the `isAuthenticated` gate — these
+ * routes are the only way to obtain a token in the first place, so they must
+ * be reachable by anyone. `/verify` is the one exception that still requires
+ * a token, applied inline below rather than at the router level.
+ *
+ * Key exports: an Express Router with `POST /signup`, `POST /login`, `GET /verify`.
+ */
 const express = require("express");
 const router = express.Router();
 
@@ -16,7 +26,17 @@ const { isAuthenticated } = require("../middleware/jwt.middleware.js");
 // How many rounds should bcrypt run the salt (default - 10 rounds)
 const saltRounds = 10;
 
-// POST /auth/signup  - Creates a new user in the database
+/**
+ * POST /auth/signup
+ * Creates a new user account.
+ *
+ * @access Public
+ * @body {string} name, lastName, dateOfBirth, phoneNumber, email, password - all required, non-empty
+ * @returns 201 with `{ user }` (password omitted); 400 for a missing/blank
+ *   field, an invalid email, a password failing the strength regex, or an
+ *   email already in use (checked up front, and again via the unique index
+ *   if two signups race).
+ */
 router.post("/signup", async (req, res, next) => {
   const { name, lastName, dateOfBirth, phoneNumber, email, password } =
     req.body;
@@ -97,7 +117,17 @@ router.post("/signup", async (req, res, next) => {
   res.status(201).json({ user: user });
 });
 
-// POST  /auth/login - Verifies email and password and returns a JWT
+/**
+ * POST /auth/login
+ * Verifies email + password and returns a 6-hour JWT.
+ *
+ * @access Public
+ * @body {string} email, password - both required
+ * @returns 200 with `{ authToken, data: { _id, name } }`; 400 if either field
+ *   is missing/blank; 401 for a nonexistent email or a wrong password — both
+ *   share the exact same message so a caller can't use this endpoint to probe
+ *   which emails are registered.
+ */
 router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
 
@@ -144,7 +174,14 @@ router.post("/login", async (req, res, next) => {
   res.status(200).json({ authToken: authToken, data: { _id, name } });
 });
 
-// GET  /auth/verify  -  Used to verify JWT stored on the client
+/**
+ * GET /auth/verify
+ * Confirms a client-held token is still valid and returns its payload.
+ *
+ * @access Private — requires a valid Bearer token (see isAuthenticated middleware)
+ * @returns 200 with the decoded token payload (`_id`, `email`, `name`,
+ *   `profilePic`); 401 if the token is missing, malformed, or expired.
+ */
 router.get("/verify", isAuthenticated, (req, res, next) => {
   // If JWT token is valid the payload gets decoded by the
   // isAuthenticated middleware and is made available on `req.payload`

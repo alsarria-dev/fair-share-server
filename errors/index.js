@@ -1,3 +1,18 @@
+/**
+ * Registers the two terminal middlewares that close out the request pipeline:
+ * a 404 catch-all for unmatched routes, and a centralized error handler that
+ * maps every thrown/rejected error reaching it (via `next(err)`, including
+ * Express 5's automatic forwarding from a rejected promise in an async route
+ * handler) to a status code and a `{ message }` body — see the branches below
+ * for exactly which error shapes map to which status.
+ *
+ * Must be mounted last in app.js: Express matches middleware in registration
+ * order, so anything mounted after this would never run for a 404 or a caught
+ * error.
+ *
+ * @param {import("express").Express} app - the Express application to configure
+ * @returns {void}
+ */
 module.exports = (app) => {
   app.use((req, res, next) => {
     // this middleware runs whenever requested page is not available

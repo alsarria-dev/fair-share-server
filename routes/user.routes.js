@@ -1,3 +1,11 @@
+/**
+ * User profile endpoints: read one/all users, update your own profile.
+ *
+ * Mounted at `/user` behind `isAuthenticated` in app.js — every handler here
+ * can assume `req.payload._id` is a valid, verified caller id.
+ *
+ * Key exports: an Express Router with `GET /:userId`, `GET /`, `PUT /:userId`.
+ */
 const express = require("express");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
@@ -21,7 +29,15 @@ const UPDATABLE_FIELDS = [
   "password",
 ];
 
-// Gets user details
+/**
+ * GET /user/:userId
+ * Fetches one user's profile.
+ *
+ * @access Private
+ * @param {string} userId - route param, must be a valid MongoDB ObjectId
+ * @returns 200 with the user (password never included, via schema `select: false`);
+ *   400 for a malformed id; 404 if no such user exists.
+ */
 router.get("/:userId", async (req, res, next) => {
   const { userId } = req.params;
 
@@ -40,13 +56,34 @@ router.get("/:userId", async (req, res, next) => {
   res.status(200).json(user);
 });
 
-// Gets all users
+/**
+ * GET /user/
+ * Lists every user in the system.
+ *
+ * @access Private
+ * @returns 200 with an array of users (passwords omitted).
+ */
 router.get("/", async (req, res, next) => {
   const users = await User.find().lean();
   res.status(200).json(users);
 });
 
-// Updates user details
+/**
+ * PUT /user/:userId
+ * Updates the caller's own profile. A new `password`, if present, is
+ * re-hashed here — never persisted verbatim.
+ *
+ * @access Private — self only; `req.payload._id` must equal `:userId`
+ * @param {string} userId - route param, must be a valid MongoDB ObjectId
+ * @body {string} [name], [lastName], [dateOfBirth], [phoneNumber], [email],
+ *   [profilePic], [password] - only fields in `UPDATABLE_FIELDS` are ever
+ *   written, so an unlisted body field (or `_id`, etc.) is silently ignored
+ *   rather than triggering mass-assignment onto the schema.
+ * @returns 200 with `{ userUpdated, authToken, message }` (a fresh token,
+ *   since the payload embeds profile fields that may have just changed);
+ *   400 for a blank required field or a malformed id; 403 if `:userId` isn't
+ *   the caller's own id; 404 if the user doesn't exist.
+ */
 router.put("/:userId", async (req, res, next) => {
   const { userId } = req.params;
 

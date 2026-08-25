@@ -1,3 +1,15 @@
+/**
+ * Standalone script that generates fake User/Group/Expense fixture data and
+ * writes it to `dummy_data/*.json`.
+ *
+ * Run manually with `node utils/generateDummyData.js` — it isn't wired to any
+ * npm script, and nothing in the app currently loads its output into MongoDB
+ * automatically. To seed a database with the generated files, import them
+ * yourself (e.g. `mongoimport`).
+ *
+ * Not required by any other file in this codebase — it's a one-off data
+ * generator, not a module other code depends on.
+ */
 const fs = require("fs");
 const crypto = require("crypto");
 

@@ -1,3 +1,14 @@
+/**
+ * An expense-sharing group: a set of members (`groupUsers`) plus the expenses
+ * logged against them (`groupExpenses`). `groupAuthor` is both the creator and
+ * the only member authorized to edit/delete the group or transfer authorship
+ * (see group.routes.js) — membership alone is not enough for those actions.
+ *
+ * References: `groupAuthor`/`groupUsers` → User; `groupExpenses` → Expense.
+ * Referenced by: `Expense.group`.
+ *
+ * Key exports: the `Group` model.
+ */
 const { Schema, model } = require("mongoose");
 
 const groupSchema = new Schema(
@@ -19,6 +30,8 @@ const groupSchema = new Schema(
       {
         type: Schema.Types.ObjectId,
         ref: "User",
+        // Supports `Group.find({ groupUsers: userId })` in group.routes.js —
+        // the "groups I belong to" lookup runs on nearly every authenticated request.
         index: true,
       },
     ],
